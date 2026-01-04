@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Трекер привычек: 5 янв — 31 мар 2026</title>
+  <style>
+    :root { --bd:#e8e8e8; --tx:#111; --mut:#666; --bg:#fff; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 22px; max-width: 1150px; color:var(--tx); background: var(--bg); }
+    h1 { font-size: 20px; margin: 0 0 10px; }
+    .muted { color: var(--mut); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .card { border: 1px solid var(--bd); border-radius: 16px; padding: 14px; margin: 12px 0; background:#fff; }
+    button, select { padding: 9px 12px; border-radius: 12px; border: 1px solid #d9d9d9; background: #fff; cursor: pointer; }
+    button.primary { background:#111; color:#fff; border-color:#111; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .pill { display:inline-block; padding: 3px 10px; border-radius: 999px; border:1px solid var(--bd); font-size:12px; }
+    .legend { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .legend .item { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--mut); }
+    .mark { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:8px; border:1px solid var(--bd); font-weight:700; color:#111; }
+    .mark.done { background:#111; color:#fff; border-color:#111; }
+    .mark.miss { background:#fff; border-style:dashed; }
+
+    .summary { display:grid; grid-template-columns: repeat(4, minmax(170px,1fr)); gap: 10px; }
+    .kpi { border:1px solid var(--bd); border-radius: 14px; padding: 10px 12px; }
+    .kpi b { font-size: 18px; }
+
+    .grid { display:grid; grid-template-columns: 260px repeat(7, 1fr); gap: 8px; }
+    .head { font-size: 12px; color: var(--mut); padding: 6px 6px; }
+    .habit { padding: 6px 6px; }
+
+    .cell{
+      border:1px solid var(--bd);
+      border-radius:12px;
+      min-height:34px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      user-select:none;
+      cursor:pointer;
+      transition: transform .06s ease, background-color .12s ease, border-color .12s ease;
+      background:#fff;
+    }
+    .cell:active{ transform:scale(0.98); }
+    .cell .sm{ font-size:12px; color:var(--mut); }
+
+    /* лёгкая тонировка строки привычки */
+    .cell.tint{ background: var(--tint); border-color: var(--border); }
+
+    /* сделано */
+    .cell.done{ background: var(--doneBg); border-color: var(--doneBorder); }
+    .cell.done .sm{ color:#111; font-weight:700; }
+
+    /* не сделано (явно) */
+    .cell.miss{
+      border-color: var(--missBorder);
+      background:
+        linear-gradient(135deg, rgba(0,0,0,0.06) 0 10px, rgba(0,0,0,0.0) 10px 20px),
+        var(--missBg);
+    }
+    .cell.miss .sm{ color:#333; font-weight:700; }
+
+    /* выключенные клетки */
+    .cell.off{ opacity:0.25; cursor:default; background:#fff; }
+
+    .habit-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:12px;
+      border:1px solid var(--bd);
+      font-weight:800;
+      font-size:13px;
+      line-height:1;
+    }
+    .habit-dot{ width:10px; height:10px; border-radius:999px; background:currentColor; flex:0 0 10px; }
+    .habit-sub{ display:block; margin-top:6px; font-size:12px; color:var(--mut); padding-left:2px; }
+
+    .table{ width:100%; border-collapse:collapse; }
+    .table th, .table td{ border-bottom:1px solid #f0f0f0; padding:8px 6px; text-align:left; font-size:13px; vertical-align:top; }
+    .table th{ color:var(--mut); font-weight:600; }
+    .right{ text-align:right; }
+
+    .toast{
+      position:fixed;
+      left:50%;
+      bottom:22px;
+      transform:translateX(-50%);
+      background: rgba(17,17,17,.92);
+      color:#fff;
+      padding:10px 12px;
+      border-radius:12px;
+      font-size:13px;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .2s ease;
+      max-width:92vw;
+      text-align:center;
+      white-space:nowrap;
+    }
+    .toast.show{ opacity:1; }
+
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 220px repeat(7, 1fr); }
+      .summary { grid-template-columns: repeat(2, minmax(170px,1fr)); }
+      .toast { white-space: normal; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Трекер привычек — 5 января → 31 марта 2026</h1>
+  <div class="muted">Клик по ячейке: пусто → ✓ → ✕ → пусто. Данные хранятся в этом браузере (localStorage).</div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <div class="row">
+        <span class="pill" id="rangePill"></span>
+        <span class="pill" id="todayPill"></span>
+      </div>
+      <div class="row">
+        <label class="muted">Показывать:</label>
+        <select id="viewSel">
+          <option value="all">Весь период</option>
+          <option value="week">Текущую неделю</option>
+        </select>
+        <button id="goTableBtn">К таблице</button>
+      </div>
+    </div>
+
+    <div style="height:10px"></div>
+    <div class="legend">
+      <div class="item"><span class="mark"></span> пусто — не отмечала</div>
+      <div class="item"><span class="mark done">✓</span> сделано</div>
+      <div class="item"><span class="mark miss">✕</span> не сделано</div>
+      <div class="item">спорт: ✓ максимум 2 раза в неделю</div>
+      <div class="item">«без сладкого/мучного»: 05.01–05.02</div>
+    </div>
+
+    <div style="height:12px"></div>
+    <div class="summary">
+      <div class="kpi">
+        <div class="muted">Общий прогресс (✓)</div>
+        <b><span id="overallPct">0</span>%</b>
+        <div class="muted"><span id="overallDone">0</span> / <span id="overallTotal">0</span> возможных (только активные дни привычек)</div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Дней в периоде</div>
+        <b><span id="daysCount">0</span></b>
+        <div class="muted">05.01.2026 → 31.03.2026</div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Лучшая серия (✓ подряд)</div>
+        <b><span id="bestStreak">0</span></b>
+        <div class="muted">максимум по привычкам</div>
+      </div>
+      <div class="kpi">
+        <div class="muted">Спорт: недели закрыты (2/нед)</div>
+        <b><span id="sportWeeks">0</span></b>
+        <div class="muted"><span id="sportWeeksTotal">0</span> недель</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="gridCard">
+    <div class="row" style="justify-content:space-between;">
+      <b id="gridTitle">Весь период</b>
+      <span class="muted" id="hint"></span>
+    </div>
+    <div style="height:10px"></div>
+    <div id="gridWrap"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;">
+      <b>Сводка по привычкам</b>
+      <span class="muted">по всему периоду (для ограниченных — по их окну)</span>
+    </div>
+    <div style="height:8px"></div>
+    <table class="table" id="summaryTable"></table>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  const LS_KEY = "habits_tracker_2026_q1_v5_limited_habit";
+
+  // Общий период (включительно)
+  const START = new Date("2026-01-05T12:00:00");
+  const END   = new Date("2026-03-31T12:00:00");
+
+  // Привычки + цвета (+ опциональное окно активности)
+  // activeFrom / activeTo — ISO YYYY-MM-DD (включительно)
+  const HABITS = [
+    { id:"warmup", name:"Зарядка", type:"daily", color:"#F4C430" },
+    { id:"sport",  name:"Спорт (2 раза в неделю)", type:"weekly_goal", goalPerWeek:4, color:"#2563EB" },
+    { id:"en",     name:"Английский", type:"daily", color:"#7C3AED" },
+    { id:"nomat",  name:"Без мата", type:"daily", color:"#16A34A" },
+    { id:"med",    name:"Медитация", type:"daily", color:"#2DD4BF" },
+    { id:"water",  name:"Вода", type:"daily", color:"#38BDF8" },
+    { id:"am_nf",  name:"Утро без телефона (≥15 мин)", type:"daily", color:"#FB923C" },
+    { id:"pm_nf",  name:"Вечер без телефона (≥15 мин)", type:"daily", color:"#4F46E5" },
+    { id:"nosugarflour", name:"Без сладкого/мучного", type:"daily", color:"#EF4444", activeFrom:"2026-01-05", activeTo:"2026-02-05" },
+  ];
+
+  // Статусы: 0 = пусто, 1 = сделано, -1 = не сделано
+  function nextStatus(curr) {
+    if (curr === 0) return 1;
+    if (curr === 1) return -1;
+    return 0;
+  }
+
+  // ---------- helpers ----------
+  function isoDate(d) {
+    const x = new Date(d);
+    x.setHours(12,0,0,0);
+    return x.toISOString().slice(0,10);
+  }
+  function dateFromIso(iso) {
+    return new Date(iso + "T12:00:00");
+  }
+  function addDays(d, n) {
+    const x = new Date(d);
+    x.setDate(x.getDate() + n);
+    x.setHours(12,0,0,0);
+    return x;
+  }
+  function clampToPeriod(d) {
+    const x = new Date(d);
+    x.setHours(12,0,0,0);
+    if (x < START) return new Date(START);
+    if (x > END) return new Date(END);
+    return x;
+  }
+  function eachDayInclusive(start, end) {
+    const out = [];
+    let d = new Date(start); d.setHours(12,0,0,0);
+    const e = new Date(end); e.setHours(12,0,0,0);
+    while (d <= e) { out.push(new Date(d)); d = addDays(d, 1); }
+    return out;
+  }
+
+  // Week: Monday..Sunday
+  function startOfWeek(d) {
+    const x = new Date(d);
+    x.setHours(12,0,0,0);
+    const dow = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - dow);
+    return x;
+  }
+  function endOfWeek(d) { return addDays(startOfWeek(d), 6); }
+  function weekKey(d) { return isoDate(startOfWeek(d)); }
+
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(LS_KEY));
+      if (s && s.days) return s;
+      return { days: {} };
+    } catch { return { days: {} }; }
+  }
+  function save(state) { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+
+  function getStatus(state, habitId, dateIso) {
+    const v = state.days?.[dateIso]?.[habitId];
+    return (v === 1 || v === -1) ? v : 0;
+  }
+  function setStatus(state, habitId, dateIso, value) {
+    if (!state.days) state.days = {};
+    if (value === 0) {
+      if (state.days?.[dateIso]?.[habitId] != null) {
+        delete state.days[dateIso][habitId];
+        if (Object.keys(state.days[dateIso]).length === 0) delete state.days[dateIso];
+      }
+      return;
+    }
+    if (!state.days[dateIso]) state.days[dateIso] = {};
+    state.days[dateIso][habitId] = value;
+  }
+
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(window.__toastT);
+    window.__toastT = setTimeout(() => el.classList.remove("show"), 1800);
+  }
+
+  // Окно активности привычки (если нет — весь общий период)
+  function habitWindow(h) {
+    const from = h.activeFrom ? dateFromIso(h.activeFrom) : START;
+    const to   = h.activeTo ? dateFromIso(h.activeTo) : END;
+    // пересекаем с общим периодом
+    const s = from < START ? START : from;
+    const e = to > END ? END : to;
+    return { start: s, end: e };
+  }
+  function isHabitActiveOn(h, d) {
+    const { start, end } = habitWindow(h);
+    return d >= start && d <= end;
+  }
+
+  // спорт: сколько ✓ в неделе (учитывая окно привычки — у спорта окна нет, но оставим универсально)
+  function sportDoneCountInWeek(state, anyDate) {
+    const sport = HABITS.find(x => x.id === "sport");
+    const ws = startOfWeek(anyDate);
+    const we = endOfWeek(anyDate);
+
+    // ограничим неделей, общим периодом и окном спорта (если появится)
+    const hw = habitWindow(sport);
+    const s = new Date(Math.max(ws.getTime(), START.getTime(), hw.start.getTime()));
+    const e = new Date(Math.min(we.getTime(), END.getTime(), hw.end.getTime()));
+
+    const dates = eachDayInclusive(s, e);
+    let c = 0;
+    for (const d of dates) if (getStatus(state, "sport", isoDate(d)) === 1) c++;
+    return c;
+  }
+
+  // прогресс привычки: считаем только по активным дням
+  function calcProgress(state, habit, allDates) {
+    let done = 0, miss = 0, total = 0;
+    for (const d of allDates) {
+      if (!isHabitActiveOn(habit, d)) continue;
+      total++;
+      const v = getStatus(state, habit.id, isoDate(d));
+      if (v === 1) done++;
+      else if (v === -1) miss++;
+    }
+    const pct = total ? Math.round(done / total * 100) : 0;
+    return { done, miss, total, pct };
+  }
+
+  // серия ✓ подряд (учитывает только активные дни; если сегодня вне окна — считаем от последнего активного дня)
+  function calcStreakDone(state, habit, allDates) {
+    const { start, end } = habitWindow(habit);
+    const today = clampToPeriod(new Date());
+    const anchor = (today < start) ? end : (today > end ? end : today);
+
+    const anchorIso = isoDate(anchor);
+    let endIdx = allDates.findIndex(x => isoDate(x) === anchorIso);
+    if (endIdx < 0) endIdx = allDates.length - 1;
+
+    let streak = 0;
+    for (let i = endIdx; i >= 0; i--) {
+      const d = allDates[i];
+      if (!isHabitActiveOn(habit, d)) continue;
+      const key = isoDate(d);
+      if (getStatus(state, habit.id, key) === 1) streak++;
+      else break;
+    }
+    return streak;
+  }
+
+  // спорт: недели закрыты 2/нед (по ✓)
+  function sportWeeklyStats(state, allDates) {
+    const counts = new Map();
+    const weeks = new Set();
+
+    for (const d of allDates) {
+      const wk = weekKey(d);
+      weeks.add(wk);
+      if (getStatus(state, "sport", isoDate(d)) === 1) counts.set(wk, (counts.get(wk) || 0) + 1);
+    }
+
+    let completed = 0;
+    for (const wk of weeks) if ((counts.get(wk) || 0) >= 2) completed++;
+    return { completed, total: weeks.size };
+  }
+
+  // ---------- render ----------
+  function render() {
+    const state = load();
+    const allDates = eachDayInclusive(START, END);
+
+    document.getElementById("rangePill").textContent = `Период: 2026-01-05 → 2026-03-31`;
+    const todayClamped = clampToPeriod(new Date());
+    document.getElementById("todayPill").textContent =
+      `Сегодня: ${isoDate(new Date())} (в периоде: ${isoDate(todayClamped)})`;
+
+    document.getElementById("daysCount").textContent = String(allDates.length);
+
+    // Overall: считаем только ✓ и только активные дни каждой привычки
+    let overallTotal = 0;
+    let overallDone = 0;
+    for (const d of allDates) {
+      const key = isoDate(d);
+      for (const h of HABITS) {
+        if (!isHabitActiveOn(h, d)) continue;
+        overallTotal++;
+        if (getStatus(state, h.id, key) === 1) overallDone++;
+      }
+    }
+    document.getElementById("overallTotal").textContent = String(overallTotal);
+    document.getElementById("overallDone").textContent = String(overallDone);
+    document.getElementById("overallPct").textContent = overallTotal ? String(Math.round(overallDone / overallTotal * 100)) : "0";
+
+    // best streak
+    let best = 0;
+    for (const h of HABITS) best = Math.max(best, calcStreakDone(state, h, allDates));
+    document.getElementById("bestStreak").textContent = String(best);
+
+    // sport weeks
+    const sw = sportWeeklyStats(state, allDates);
+    document.getElementById("sportWeeks").textContent = String(sw.completed);
+    document.getElementById("sportWeeksTotal").textContent = String(sw.total);
+
+    // view
+    const view = document.getElementById("viewSel").value;
+    let datesToShow = allDates;
+    let title = "Весь период";
+
+    if (view === "week") {
+      const wkStart = startOfWeek(todayClamped);
+      const wkEnd = endOfWeek(todayClamped);
+      const s = wkStart < START ? START : wkStart;
+      const e = wkEnd > END ? END : wkEnd;
+      datesToShow = eachDayInclusive(s, e);
+      title = `Неделя: ${isoDate(s)} → ${isoDate(e)}`;
+    }
+
+    document.getElementById("gridTitle").textContent = title;
+    document.getElementById("hint").textContent = "клик: пусто → ✓ → ✕ → пусто (спорт: ✓ максимум 2/нед)";
+
+    // grid
+    const dowNames = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+    const wrap = document.getElementById("gridWrap");
+    wrap.innerHTML = "";
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+
+    // header row
+    const empty = document.createElement("div");
+    empty.className = "head";
+    grid.appendChild(empty);
+    for (const n of dowNames) {
+      const h = document.createElement("div");
+      h.className = "head";
+      h.textContent = n;
+      grid.appendChild(h);
+    }
+
+    // week starts for current view
+    const weekStarts = [];
+    {
+      const first = startOfWeek(datesToShow[0]);
+      const last = startOfWeek(datesToShow[datesToShow.length - 1]);
+      let cur = new Date(first); cur.setHours(12,0,0,0);
+      while (cur <= last) { weekStarts.push(new Date(cur)); cur = addDays(cur, 7); }
+    }
+
+    // fast lookup of dates in view
+    const inView = new Set(datesToShow.map(d => isoDate(d)));
+
+    for (const habit of HABITS) {
+      const hw = habitWindow(habit);
+
+      for (let w = 0; w < weekStarts.length; w++) {
+        const wkStart = weekStarts[w];
+
+        // Left label
+        const rowLabel = document.createElement("div");
+        rowLabel.className = "habit";
+        if (w === 0) {
+          const windowText = (habit.activeFrom || habit.activeTo)
+            ? `активно: ${habit.activeFrom} → ${habit.activeTo}`
+            : "активно: весь период";
+
+          rowLabel.innerHTML = `
+            <span class="habit-badge" style="color:${habit.color}; border-color:${habit.color}55; background:${habit.color}10;">
+              <span class="habit-dot"></span>
+              ${habit.name}
+            </span>
+            <span class="habit-sub">${habit.id === "sport" ? "цель: 2 раза в неделю" : windowText}</span>
+          `;
+        } else {
+          rowLabel.textContent = " ";
+        }
+        grid.appendChild(rowLabel);
+
+        // Cells (Mon..Sun)
+        for (let col = 0; col < 7; col++) {
+          const d = addDays(wkStart, col);
+          const dIso = isoDate(d);
+
+          const inPeriod = (d >= START && d <= END);
+          const showByView = inView.has(dIso);
+          const activeToday = isHabitActiveOn(habit, d);
+
+          const cell = document.createElement("div");
+          cell.className = "cell";
+
+          // Hide/disable cell if not shown or outside period or outside habit window
+          if (!inPeriod || !showByView || !activeToday) {
+            cell.classList.add("off");
+            cell.innerHTML = `<span class="sm">${(inPeriod && showByView) ? dIso.slice(8,10) : ""}</span>`;
+            grid.appendChild(cell);
+            continue;
+          }
+
+          // Always tint by habit color (even if empty)
+          cell.classList.add("tint");
+          cell.style.setProperty("--border", habit.color + "55");
+          cell.style.setProperty("--tint", habit.color + "12");
+
+          const status = getStatus(state, habit.id, dIso);
+
+          // apply status styles
+          if (status === 1) {
+            cell.classList.add("done");
+            cell.style.setProperty("--doneBorder", habit.color);
+            cell.style.setProperty("--doneBg", habit.color + "25");
+          } else if (status === -1) {
+            cell.classList.add("miss");
+            cell.style.setProperty("--missBorder", habit.color + "AA");
+            cell.style.setProperty("--missBg", habit.color + "18");
+          }
+
+          const day = dIso.slice(8,10);
+          const mark = (status === 1) ? " ✓" : (status === -1 ? " ✕" : "");
+          cell.innerHTML = `<span class="sm">${day}${mark}</span>`;
+
+          cell.onclick = () => {
+            const st = load();
+            const curr = getStatus(st, habit.id, dIso);
+            const next = nextStatus(curr);
+
+            // спорт: ограничиваем только ✓ (next === 1)
+            if (habit.id === "sport" && next === 1) {
+              const count = sportDoneCountInWeek(st, dateFromIso(dIso));
+              if (count >= 2) {
+                toast("Спорт уже отмечен ✓ 2 раза на этой неделе 🙂");
+                return;
+              }
+            }
+
+            setStatus(st, habit.id, dIso, next);
+            save(st);
+            render();
+          };
+
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    wrap.appendChild(grid);
+
+    // summary table
+    const tbl = document.getElementById("summaryTable");
+    tbl.innerHTML = `
+      <tr>
+        <th>Привычка</th>
+        <th class="right">✓ сделано</th>
+        <th class="right">✕ не сделано</th>
+        <th class="right">Всего дней</th>
+        <th class="right">Серия ✓</th>
+        <th class="right">Примечание</th>
+      </tr>
+    `;
+
+    for (const h of HABITS) {
+      const pr = calcProgress(state, h, allDates);
+      const st = calcStreakDone(state, h, allDates);
+      let note = (h.activeFrom || h.activeTo) ? `${h.activeFrom} → ${h.activeTo}` : "весь период";
+      if (h.id === "sport") {
+        const wk = sportWeeklyStats(state, allDates);
+        note = `✓ максимум 2/нед; недель закрыто ${wk.completed}/${wk.total}`;
+      }
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>
+          <span class="habit-badge" style="color:${h.color}; border-color:${h.color}55; background:${h.color}10;">
+            <span class="habit-dot"></span>${h.name}
+          </span>
+        </td>
+        <td class="right"><b>${pr.done}</b> <span class="muted">(${pr.pct}%)</span></td>
+        <td class="right">${pr.miss}</td>
+        <td class="right">${pr.total}</td>
+        <td class="right">${st}</td>
+        <td class="right"><span class="muted">${note}</span></td>
+      `;
+      tbl.appendChild(tr);
+    }
+
+    // buttons
+    document.getElementById("goTableBtn").onclick = () => {
+      document.getElementById("gridCard").scrollIntoView({ behavior:"smooth", block:"start" });
+    };
+  }
+
+  document.getElementById("viewSel").onchange = render;
+
+  render();
+</script>
+</body>
+</html>
