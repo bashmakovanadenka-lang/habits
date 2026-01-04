@@ -154,6 +154,36 @@
     font-size: 11px;
   }
 }
+    /* Мобилка: режим "Неделя" — 7 дней должны влезть */
+@media (max-width: 520px) {
+  /* в режиме недели уменьшаем левую колонку и клетки */
+  .grid.week {
+    grid-template-columns: 96px repeat(7, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  .head { font-size: 11px; padding: 4px 2px; text-align:center; }
+
+  .habit-badge {
+    padding: 4px 6px;
+    font-size: 12px;
+    border-radius: 10px;
+    justify-content: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .habit-dot { display:none; }
+  .habit-sub { display:none; }
+
+  .cell {
+    min-height: 26px;
+    border-radius: 9px;
+  }
+  .cell .sm { font-size: 11px; }
+
+  /* В режиме недели скрываем лишние подписи/подсказки, чтобы не засорять экран */
+  #hint { display:none; }
+}
   </style>
 </head>
 <body>
@@ -640,9 +670,8 @@ rowLabel.innerHTML = `
             cell.style.setProperty("--missBg", habit.color + "18");
           }
 
-          const day = dIso.slice(8,10);
-          const mark = (status === 1) ? " ✓" : (status === -1 ? " ✕" : "");
-          cell.innerHTML = `<span class="sm">${day}${mark}</span>`;
+         const day = dIso.slice(8,10);
+cell.innerHTML = `<span class="sm">${day}</span>`;
 
           cell.onclick = () => {
             const st = load();
