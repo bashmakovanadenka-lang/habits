@@ -286,6 +286,8 @@
     { id:"water",  name:"Вода", type:"daily", color:"#38BDF8" },
     { id:"am_nf",  name:"Утро без телефона (≥15 мин)", type:"daily", color:"#FB923C" },
     { id:"pm_nf",  name:"Вечер без телефона (≥15 мин)", type:"daily", color:"#4F46E5" },
+    { id:"vitamins", name:"Витамины", type:"daily", color:"#A3E635" },
+{ id:"thoughts", name:"Мысли", type:"daily", color:"#F472B6" },
     { id:"nosugarflour", name:"Без сладкого/мучного", type:"daily", color:"#EF4444", activeFrom:"2026-01-05", activeTo:"2026-02-05" },
   ];
 
@@ -615,6 +617,8 @@ const shortNameMap = {
   water: "Вода",
   am_nf: "Утро",
   pm_nf: "Вечер",
+  vitamins: "Витамины",
+thoughts: "Мысли",
   nosugarflour: "Без сладкого",
 };
 
@@ -677,11 +681,6 @@ cell.innerHTML = `<span class="sm">${day}</span>`;
             const st = load();
             const curr = getStatus(st, habit.id, dIso);
             const next = nextStatus(curr);
-
-            if (habit.id === "sport" && next === 1) {
-              const count = sportDoneCountInWeek(st, dateFromIso(dIso));
-              if (count >= 2) { toast("Спорт уже отмечен ✓ 2 раза на этой неделе 🙂"); return; }
-            }
 
             setStatus(st, habit.id, dIso, next);
             save(st);
