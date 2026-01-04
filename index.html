@@ -124,6 +124,36 @@
   .cell { min-height: 30px; border-radius: 10px; }
   .cell .sm { font-size: 11px; }
 }
+    /* Мобилка: неделя должна помещаться целиком */
+@media (max-width: 520px) {
+  .grid {
+    grid-template-columns: 110px repeat(7, 1fr) !important;
+  }
+
+  .habit-badge {
+    padding: 5px 6px;
+    font-size: 12px;
+    border-radius: 10px;
+    justify-content: center;
+  }
+
+  .habit-dot {
+    display: none; /* убираем кружки */
+  }
+
+  .habit-sub {
+    display: none; /* убираем "активно..." */
+  }
+
+  .cell {
+    min-height: 28px;
+    border-radius: 9px;
+  }
+
+  .cell .sm {
+    font-size: 11px;
+  }
+}
   </style>
 </head>
 <body>
@@ -549,13 +579,13 @@
 const shortNameMap = {
   warmup: "Зарядка",
   sport: "Спорт",
-  en: "Англ.",
+  en: "Английский",
   nomat: "Без мата",
-  med: "Медит.",
+  med: "Медитация",
   water: "Вода",
-  am_nf: "Утро без 📵",
-  pm_nf: "Вечер без 📵",
-  nosugarflour: "Без сладк.",
+  am_nf: "Утро",
+  pm_nf: "Вечер",
+  nosugarflour: "Без сладкого",
 };
 
 const label = compact ? (shortNameMap[habit.id] || habit.name) : habit.name;
