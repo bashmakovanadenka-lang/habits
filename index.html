@@ -115,6 +115,15 @@
       .summary { grid-template-columns: 1fr; }
       .grid { grid-template-columns: 190px repeat(7, 1fr); }
     }
+    /* Мобильная упаковка: неделя должна помещаться */
+@media (max-width: 520px) {
+  .grid { grid-template-columns: 130px repeat(7, 1fr) !important; }
+  .habit-badge { padding: 6px 8px; font-size: 12px; border-radius: 10px; }
+  .habit-dot { width: 8px; height: 8px; }
+  .habit-sub { display: none; } /* скрываем "активно..." на телефоне */
+  .cell { min-height: 30px; border-radius: 10px; }
+  .cell .sm { font-size: 11px; }
+}
   </style>
 </head>
 <body>
@@ -535,13 +544,32 @@
           const windowText = (habit.activeFrom || habit.activeTo)
             ? `активно: ${habit.activeFrom} → ${habit.activeTo}`
             : "активно: весь период";
-          rowLabel.innerHTML = `
-            <span class="habit-badge" style="color:${habit.color}; border-color:${habit.color}55; background:${habit.color}10;">
-              <span class="habit-dot"></span>
-              ${habit.name}
-            </span>
-            <span class="habit-sub">${habit.id === "sport" ? "цель: 2 раза в неделю" : windowText}</span>
-          `;
+          const compact = isMobile() && view === "week";
+
+const shortNameMap = {
+  warmup: "Зарядка",
+  sport: "Спорт",
+  en: "Англ.",
+  nomat: "Без мата",
+  med: "Медит.",
+  water: "Вода",
+  am_nf: "Утро без 📵",
+  pm_nf: "Вечер без 📵",
+  nosugarflour: "Без сладк.",
+};
+
+const label = compact ? (shortNameMap[habit.id] || habit.name) : habit.name;
+const sub = (habit.id === "sport")
+  ? "цель: 2 раза в неделю"
+  : windowText;
+
+rowLabel.innerHTML = `
+  <span class="habit-badge" style="color:${habit.color}; border-color:${habit.color}55; background:${habit.color}10;">
+    <span class="habit-dot"></span>
+    ${label}
+  </span>
+  <span class="habit-sub">${sub}</span>
+`;
         } else {
           rowLabel.textContent = " ";
         }
