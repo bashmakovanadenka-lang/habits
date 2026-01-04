@@ -25,7 +25,10 @@
     .kpi { border:1px solid var(--bd); border-radius: 14px; padding: 10px 12px; }
     .kpi b { font-size: 18px; }
 
-    .grid { display:grid; grid-template-columns: 260px repeat(7, 1fr); gap: 8px; }
+    /* grid */
+    .gridWrapScroll { overflow:auto; -webkit-overflow-scrolling: touch; }
+    .grid { display:grid; grid-template-columns: 260px repeat(7, 1fr); gap: 8px; min-width: 860px; }
+    .grid.week { min-width: 0; } /* неделя без горизонтального скролла */
     .head { font-size: 12px; color: var(--mut); padding: 6px 6px; }
     .habit { padding: 6px 6px; }
 
@@ -44,14 +47,11 @@
     .cell:active{ transform:scale(0.98); }
     .cell .sm{ font-size:12px; color:var(--mut); }
 
-    /* лёгкая тонировка строки привычки */
     .cell.tint{ background: var(--tint); border-color: var(--border); }
 
-    /* сделано */
     .cell.done{ background: var(--doneBg); border-color: var(--doneBorder); }
     .cell.done .sm{ color:#111; font-weight:700; }
 
-    /* не сделано (явно) */
     .cell.miss{
       border-color: var(--missBorder);
       background:
@@ -60,7 +60,6 @@
     }
     .cell.miss .sm{ color:#333; font-weight:700; }
 
-    /* выключенные клетки */
     .cell.off{ opacity:0.25; cursor:default; background:#fff; }
 
     .habit-badge{
@@ -101,10 +100,20 @@
     }
     .toast.show{ opacity:1; }
 
+    .weekNav { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .weekNav b { font-size: 14px; }
+    .hintBox { border:1px dashed #ddd; border-radius:12px; padding:10px 12px; background:#fff; }
+
     @media (max-width: 900px) {
-      .grid { grid-template-columns: 220px repeat(7, 1fr); }
+      body { margin: 14px; }
       .summary { grid-template-columns: repeat(2, minmax(170px,1fr)); }
+      .grid { grid-template-columns: 210px repeat(7, 1fr); min-width: 820px; }
+      .grid.week { min-width: 0; }
       .toast { white-space: normal; }
+    }
+    @media (max-width: 520px) {
+      .summary { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 190px repeat(7, 1fr); }
     }
   </style>
 </head>
@@ -119,10 +128,10 @@
         <span class="pill" id="todayPill"></span>
       </div>
       <div class="row">
-        <label class="muted">Показывать:</label>
+        <label class="muted">Вид:</label>
         <select id="viewSel">
+          <option value="week">Неделя</option>
           <option value="all">Весь период</option>
-          <option value="week">Текущую неделю</option>
         </select>
         <button id="goTableBtn">К таблице</button>
       </div>
@@ -142,7 +151,7 @@
       <div class="kpi">
         <div class="muted">Общий прогресс (✓)</div>
         <b><span id="overallPct">0</span>%</b>
-        <div class="muted"><span id="overallDone">0</span> / <span id="overallTotal">0</span> возможных (только активные дни привычек)</div>
+        <div class="muted"><span id="overallDone">0</span> / <span id="overallTotal">0</span> возможных (только активные дни)</div>
       </div>
       <div class="kpi">
         <div class="muted">Дней в периоде</div>
@@ -164,11 +173,18 @@
 
   <div class="card" id="gridCard">
     <div class="row" style="justify-content:space-between;">
-      <b id="gridTitle">Весь период</b>
+      <div class="weekNav" id="weekNav"></div>
       <span class="muted" id="hint"></span>
     </div>
     <div style="height:10px"></div>
-    <div id="gridWrap"></div>
+
+    <div id="mobileAllHint" class="hintBox" style="display:none; margin-bottom:10px;">
+      <div><b>Совет:</b> «Весь период» удобнее смотреть в <b>развороте</b> (ландшафт) или просто листать таблицу вбок.</div>
+    </div>
+
+    <div class="gridWrapScroll" id="gridScroll">
+      <div id="gridWrap"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -183,17 +199,18 @@
   <div class="toast" id="toast"></div>
 
 <script>
+  // ВАЖНО: оставляем тот же ключ, чтобы отметки не пропали
   const LS_KEY = "habits_tracker_2026_q1_v5_limited_habit";
+  const UI_KEY = "habits_tracker_2026_q1_ui";
 
   // Общий период (включительно)
   const START = new Date("2026-01-05T12:00:00");
   const END   = new Date("2026-03-31T12:00:00");
 
   // Привычки + цвета (+ опциональное окно активности)
-  // activeFrom / activeTo — ISO YYYY-MM-DD (включительно)
   const HABITS = [
     { id:"warmup", name:"Зарядка", type:"daily", color:"#F4C430" },
-    { id:"sport",  name:"Спорт (2 раза в неделю)", type:"weekly_goal", goalPerWeek:4, color:"#2563EB" },
+    { id:"sport",  name:"Спорт (2 раза в неделю)", type:"weekly_goal", goalPerWeek:2, color:"#2563EB" },
     { id:"en",     name:"Английский", type:"daily", color:"#7C3AED" },
     { id:"nomat",  name:"Без мата", type:"daily", color:"#16A34A" },
     { id:"med",    name:"Медитация", type:"daily", color:"#2DD4BF" },
@@ -216,9 +233,7 @@
     x.setHours(12,0,0,0);
     return x.toISOString().slice(0,10);
   }
-  function dateFromIso(iso) {
-    return new Date(iso + "T12:00:00");
-  }
+  function dateFromIso(iso) { return new Date(iso + "T12:00:00"); }
   function addDays(d, n) {
     const x = new Date(d);
     x.setDate(x.getDate() + n);
@@ -260,6 +275,14 @@
   }
   function save(state) { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 
+  function loadUI() {
+    try {
+      const u = JSON.parse(localStorage.getItem(UI_KEY));
+      return u || {};
+    } catch { return {}; }
+  }
+  function saveUI(u) { localStorage.setItem(UI_KEY, JSON.stringify(u)); }
+
   function getStatus(state, habitId, dateIso) {
     const v = state.days?.[dateIso]?.[habitId];
     return (v === 1 || v === -1) ? v : 0;
@@ -289,7 +312,6 @@
   function habitWindow(h) {
     const from = h.activeFrom ? dateFromIso(h.activeFrom) : START;
     const to   = h.activeTo ? dateFromIso(h.activeTo) : END;
-    // пересекаем с общим периодом
     const s = from < START ? START : from;
     const e = to > END ? END : to;
     return { start: s, end: e };
@@ -299,24 +321,17 @@
     return d >= start && d <= end;
   }
 
-  // спорт: сколько ✓ в неделе (учитывая окно привычки — у спорта окна нет, но оставим универсально)
   function sportDoneCountInWeek(state, anyDate) {
-    const sport = HABITS.find(x => x.id === "sport");
     const ws = startOfWeek(anyDate);
     const we = endOfWeek(anyDate);
-
-    // ограничим неделей, общим периодом и окном спорта (если появится)
-    const hw = habitWindow(sport);
-    const s = new Date(Math.max(ws.getTime(), START.getTime(), hw.start.getTime()));
-    const e = new Date(Math.min(we.getTime(), END.getTime(), hw.end.getTime()));
-
+    const s = ws < START ? START : ws;
+    const e = we > END ? END : we;
     const dates = eachDayInclusive(s, e);
     let c = 0;
     for (const d of dates) if (getStatus(state, "sport", isoDate(d)) === 1) c++;
     return c;
   }
 
-  // прогресс привычки: считаем только по активным дням
   function calcProgress(state, habit, allDates) {
     let done = 0, miss = 0, total = 0;
     for (const d of allDates) {
@@ -330,12 +345,10 @@
     return { done, miss, total, pct };
   }
 
-  // серия ✓ подряд (учитывает только активные дни; если сегодня вне окна — считаем от последнего активного дня)
   function calcStreakDone(state, habit, allDates) {
     const { start, end } = habitWindow(habit);
     const today = clampToPeriod(new Date());
     const anchor = (today < start) ? end : (today > end ? end : today);
-
     const anchorIso = isoDate(anchor);
     let endIdx = allDates.findIndex(x => isoDate(x) === anchorIso);
     if (endIdx < 0) endIdx = allDates.length - 1;
@@ -344,32 +357,31 @@
     for (let i = endIdx; i >= 0; i--) {
       const d = allDates[i];
       if (!isHabitActiveOn(habit, d)) continue;
-      const key = isoDate(d);
-      if (getStatus(state, habit.id, key) === 1) streak++;
+      if (getStatus(state, habit.id, isoDate(d)) === 1) streak++;
       else break;
     }
     return streak;
   }
 
-  // спорт: недели закрыты 2/нед (по ✓)
   function sportWeeklyStats(state, allDates) {
     const counts = new Map();
     const weeks = new Set();
-
     for (const d of allDates) {
       const wk = weekKey(d);
       weeks.add(wk);
       if (getStatus(state, "sport", isoDate(d)) === 1) counts.set(wk, (counts.get(wk) || 0) + 1);
     }
-
     let completed = 0;
     for (const wk of weeks) if ((counts.get(wk) || 0) >= 2) completed++;
     return { completed, total: weeks.size };
   }
 
+  function isMobile() { return window.matchMedia("(max-width: 900px)").matches; }
+
   // ---------- render ----------
   function render() {
     const state = load();
+    const ui = loadUI();
     const allDates = eachDayInclusive(START, END);
 
     document.getElementById("rangePill").textContent = `Период: 2026-01-05 → 2026-03-31`;
@@ -379,9 +391,8 @@
 
     document.getElementById("daysCount").textContent = String(allDates.length);
 
-    // Overall: считаем только ✓ и только активные дни каждой привычки
-    let overallTotal = 0;
-    let overallDone = 0;
+    // Overall: только ✓ и только активные дни
+    let overallTotal = 0, overallDone = 0;
     for (const d of allDates) {
       const key = isoDate(d);
       for (const h of HABITS) {
@@ -404,22 +415,83 @@
     document.getElementById("sportWeeks").textContent = String(sw.completed);
     document.getElementById("sportWeeksTotal").textContent = String(sw.total);
 
-    // view
-    const view = document.getElementById("viewSel").value;
+    // view: мобилка по умолчанию = week, десктоп = all
+    const sel = document.getElementById("viewSel");
+    if (!ui.view) ui.view = isMobile() ? "week" : "all";
+    sel.value = ui.view;
+
+    // week cursor (для режима неделя)
+    if (!ui.weekStart) ui.weekStart = isoDate(startOfWeek(todayClamped));
+    let weekStart = dateFromIso(ui.weekStart);
+    weekStart = clampToPeriod(weekStart);
+    weekStart = startOfWeek(weekStart);
+    let weekEnd = endOfWeek(weekStart);
+    // ограничим неделей в рамках периода
+    const ws = weekStart < START ? START : weekStart;
+    const we = weekEnd > END ? END : weekEnd;
+
     let datesToShow = allDates;
-    let title = "Весь период";
+    const view = sel.value;
 
     if (view === "week") {
-      const wkStart = startOfWeek(todayClamped);
-      const wkEnd = endOfWeek(todayClamped);
-      const s = wkStart < START ? START : wkStart;
-      const e = wkEnd > END ? END : wkEnd;
-      datesToShow = eachDayInclusive(s, e);
-      title = `Неделя: ${isoDate(s)} → ${isoDate(e)}`;
+      datesToShow = eachDayInclusive(ws, we);
     }
 
-    document.getElementById("gridTitle").textContent = title;
-    document.getElementById("hint").textContent = "клик: пусто → ✓ → ✕ → пусто (спорт: ✓ максимум 2/нед)";
+    // header / week nav
+    const nav = document.getElementById("weekNav");
+    nav.innerHTML = "";
+
+    if (view === "week") {
+      const prevBtn = document.createElement("button");
+      prevBtn.textContent = "←";
+      const nextBtn = document.createElement("button");
+      nextBtn.textContent = "→";
+
+      // границы перелистывания по неделям
+      const prevWeekStart = addDays(weekStart, -7);
+      const nextWeekStart = addDays(weekStart, 7);
+
+      prevBtn.disabled = endOfWeek(prevWeekStart) < START;
+      nextBtn.disabled = nextWeekStart > END;
+
+      prevBtn.onclick = () => {
+        ui.weekStart = isoDate(addDays(weekStart, -7));
+        saveUI(ui);
+        render();
+      };
+      nextBtn.onclick = () => {
+        ui.weekStart = isoDate(addDays(weekStart, 7));
+        saveUI(ui);
+        render();
+      };
+
+      const title = document.createElement("b");
+      title.textContent = `Неделя: ${isoDate(ws)} → ${isoDate(we)}`;
+
+      const todayBtn = document.createElement("button");
+      todayBtn.textContent = "Текущая";
+      todayBtn.onclick = () => {
+        ui.weekStart = isoDate(startOfWeek(todayClamped));
+        saveUI(ui);
+        render();
+      };
+
+      nav.appendChild(prevBtn);
+      nav.appendChild(nextBtn);
+      nav.appendChild(title);
+      nav.appendChild(todayBtn);
+
+      document.getElementById("hint").textContent = "клик: пусто → ✓ → ✕ → пусто";
+    } else {
+      const title = document.createElement("b");
+      title.textContent = "Весь период";
+      nav.appendChild(title);
+      document.getElementById("hint").textContent = "весь календарь (можно листать вбок)";
+    }
+
+    // mobile hint for all
+    const mobileAllHint = document.getElementById("mobileAllHint");
+    mobileAllHint.style.display = (isMobile() && view === "all") ? "block" : "none";
 
     // grid
     const dowNames = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
@@ -427,7 +499,7 @@
     wrap.innerHTML = "";
 
     const grid = document.createElement("div");
-    grid.className = "grid";
+    grid.className = "grid" + (view === "week" ? " week" : "");
 
     // header row
     const empty = document.createElement("div");
@@ -440,32 +512,29 @@
       grid.appendChild(h);
     }
 
-    // week starts for current view
+    // week starts: for week-view — одна неделя; for all — весь период
     const weekStarts = [];
-    {
-      const first = startOfWeek(datesToShow[0]);
-      const last = startOfWeek(datesToShow[datesToShow.length - 1]);
+    if (view === "week") {
+      weekStarts.push(startOfWeek(ws));
+    } else {
+      const first = startOfWeek(allDates[0]);
+      const last  = startOfWeek(allDates[allDates.length - 1]);
       let cur = new Date(first); cur.setHours(12,0,0,0);
       while (cur <= last) { weekStarts.push(new Date(cur)); cur = addDays(cur, 7); }
     }
 
-    // fast lookup of dates in view
-    const inView = new Set(datesToShow.map(d => isoDate(d)));
-
+    // for "all": show only within period; for "week": show all 7 days but clamp by period
     for (const habit of HABITS) {
-      const hw = habitWindow(habit);
-
       for (let w = 0; w < weekStarts.length; w++) {
         const wkStart = weekStarts[w];
 
-        // Left label
+        // left label
         const rowLabel = document.createElement("div");
         rowLabel.className = "habit";
         if (w === 0) {
           const windowText = (habit.activeFrom || habit.activeTo)
             ? `активно: ${habit.activeFrom} → ${habit.activeTo}`
             : "активно: весь период";
-
           rowLabel.innerHTML = `
             <span class="habit-badge" style="color:${habit.color}; border-color:${habit.color}55; background:${habit.color}10;">
               <span class="habit-dot"></span>
@@ -478,34 +547,31 @@
         }
         grid.appendChild(rowLabel);
 
-        // Cells (Mon..Sun)
         for (let col = 0; col < 7; col++) {
           const d = addDays(wkStart, col);
           const dIso = isoDate(d);
 
           const inPeriod = (d >= START && d <= END);
-          const showByView = inView.has(dIso);
           const activeToday = isHabitActiveOn(habit, d);
 
           const cell = document.createElement("div");
           cell.className = "cell";
 
-          // Hide/disable cell if not shown or outside period or outside habit window
-          if (!inPeriod || !showByView || !activeToday) {
+          // For week view: показываем неделю целиком, но вне периода/окна привычки выключаем
+          // For all view: всё то же, только будет много недель
+          if (!inPeriod || !activeToday) {
             cell.classList.add("off");
-            cell.innerHTML = `<span class="sm">${(inPeriod && showByView) ? dIso.slice(8,10) : ""}</span>`;
+            cell.innerHTML = `<span class="sm">${inPeriod ? dIso.slice(8,10) : ""}</span>`;
             grid.appendChild(cell);
             continue;
           }
 
-          // Always tint by habit color (even if empty)
+          // tint always
           cell.classList.add("tint");
           cell.style.setProperty("--border", habit.color + "55");
           cell.style.setProperty("--tint", habit.color + "12");
 
           const status = getStatus(state, habit.id, dIso);
-
-          // apply status styles
           if (status === 1) {
             cell.classList.add("done");
             cell.style.setProperty("--doneBorder", habit.color);
@@ -525,13 +591,9 @@
             const curr = getStatus(st, habit.id, dIso);
             const next = nextStatus(curr);
 
-            // спорт: ограничиваем только ✓ (next === 1)
             if (habit.id === "sport" && next === 1) {
               const count = sportDoneCountInWeek(st, dateFromIso(dIso));
-              if (count >= 2) {
-                toast("Спорт уже отмечен ✓ 2 раза на этой неделе 🙂");
-                return;
-              }
+              if (count >= 2) { toast("Спорт уже отмечен ✓ 2 раза на этой неделе 🙂"); return; }
             }
 
             setStatus(st, habit.id, dIso, next);
@@ -546,14 +608,19 @@
 
     wrap.appendChild(grid);
 
+    // scroll behavior:
+    // week: no forced scroll; all: keep scroll enabled
+    const sc = document.getElementById("gridScroll");
+    sc.style.overflowX = (view === "week") ? "hidden" : "auto";
+
     // summary table
     const tbl = document.getElementById("summaryTable");
     tbl.innerHTML = `
       <tr>
         <th>Привычка</th>
-        <th class="right">✓ сделано</th>
-        <th class="right">✕ не сделано</th>
-        <th class="right">Всего дней</th>
+        <th class="right">✓</th>
+        <th class="right">✕</th>
+        <th class="right">Дней</th>
         <th class="right">Серия ✓</th>
         <th class="right">Примечание</th>
       </tr>
@@ -563,10 +630,7 @@
       const pr = calcProgress(state, h, allDates);
       const st = calcStreakDone(state, h, allDates);
       let note = (h.activeFrom || h.activeTo) ? `${h.activeFrom} → ${h.activeTo}` : "весь период";
-      if (h.id === "sport") {
-        const wk = sportWeeklyStats(state, allDates);
-        note = `✓ максимум 2/нед; недель закрыто ${wk.completed}/${wk.total}`;
-      }
+      if (h.id === "sport") note = `✓ максимум 2/нед; недель закрыто ${sw.completed}/${sw.total}`;
 
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -584,13 +648,33 @@
       tbl.appendChild(tr);
     }
 
-    // buttons
+    // buttons + persist view
     document.getElementById("goTableBtn").onclick = () => {
       document.getElementById("gridCard").scrollIntoView({ behavior:"smooth", block:"start" });
     };
+    sel.onchange = () => {
+      ui.view = sel.value;
+      saveUI(ui);
+      render();
+    };
   }
 
-  document.getElementById("viewSel").onchange = render;
+  // init view default based on device once
+  (function initDefaultView() {
+    const ui = loadUI();
+    if (!ui.view) {
+      ui.view = isMobile() ? "week" : "all";
+      ui.weekStart = isoDate(startOfWeek(clampToPeriod(new Date())));
+      saveUI(ui);
+    }
+  })();
+
+  // rerender on orientation/resize (чтобы мобильный дефолт работал адекватно)
+  window.addEventListener("resize", () => {
+    // не дергаем слишком часто
+    clearTimeout(window.__rz);
+    window.__rz = setTimeout(() => render(), 120);
+  });
 
   render();
 </script>
